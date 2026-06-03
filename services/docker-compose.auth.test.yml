@@ -1,5 +1,4 @@
 services:
-
   mongodb:
     image: mongo:7
     container_name: auth-mongo
@@ -12,7 +11,20 @@ services:
     volumes:
       - mongo-data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--username", "admin", "--password", "secret", "--authenticationDatabase", "admin", "--quiet", "--eval", "db.adminCommand('ping')"]
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "--username",
+          "admin",
+          "--password",
+          "secret",
+          "--authenticationDatabase",
+          "admin",
+          "--quiet",
+          "--eval",
+          "db.adminCommand('ping')",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -32,14 +44,22 @@ services:
     ports:
       - "9092:9092"
     healthcheck:
-      test: ["CMD", "kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
+      test:
+        [
+          "CMD",
+          "/opt/kafka/bin/kafka-topics.sh",
+          "--bootstrap-server",
+          "localhost:9092",
+          "--list",
+        ]
+      interval: 20s # ← más tiempo entre intentos
+      timeout: 15s # ← más tiempo para responder
+      retries: 10 # ← más reintentos
+      start_period: 30s # ← espera inicial antes del primer check
 
   auth-service:
     build:
-      context: .
+      context: ./auth-service
       dockerfile: Dockerfile
     container_name: auth-service
     depends_on:
