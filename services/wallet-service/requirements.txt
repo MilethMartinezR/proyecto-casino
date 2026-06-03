@@ -1,0 +1,10 @@
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+sqlalchemy==2.0.30
+pymysql==1.1.1
+python-jose[cryptography]==3.3.0
+aiokafka==0.11.0
+py-eureka-client==0.11.9
+pydantic==2.7.1
+pydantic-settings==2.2.1
+cryptography==42.0.7
