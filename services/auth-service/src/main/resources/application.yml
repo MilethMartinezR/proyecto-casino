@@ -39,9 +39,15 @@ eureka:
 
 jwt:
   secret: ${JWT_SECRET:casino_jwt_super_secret_2025}
-  expiration-ms: 86400000       # 24h
-  mfa-expiration-ms: 300000     # 5 min
+  expiration-ms: 86400000
+  mfa-expiration-ms: 300000
 
 kafka:
   topics:
     auth-events: auth-events
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /docs
