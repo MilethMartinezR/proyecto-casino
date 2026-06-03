@@ -23,6 +23,10 @@ RUN if [ -f /app/wallet-service/requirements.txt ]; then pip3 install -r /app/wa
 RUN if [ -f /app/admin-service/requirements.txt ]; then pip3 install -r /app/admin-service/requirements.txt; fi
 RUN if [ -f /app/game-service/package.json ]; then cd /app/game-service && npm install; fi
 
+# Compilar servicios Java en build time solo si el pom.xml tiene contenido
+RUN if [ -f /app/auth-service/pom.xml ] && [ -s /app/auth-service/pom.xml ]; then cd /app/auth-service && mvn -q package -DskipTests; fi
+RUN if [ -f /app/audit-service/pom.xml ] && [ -s /app/audit-service/pom.xml ]; then cd /app/audit-service && mvn -q package -DskipTests; fi
+
 EXPOSE 8081 8082 8083 8084 8085
 
 CMD ["/usr/local/bin/start-services.sh"]

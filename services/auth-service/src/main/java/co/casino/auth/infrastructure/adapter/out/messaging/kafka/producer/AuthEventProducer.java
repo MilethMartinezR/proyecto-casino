@@ -13,11 +13,8 @@ public class AuthEventProducer implements AuthEventPublisherPort {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    @Value("${kafka.topics.user-registered}")
-    private String userRegisteredTopic;
-
-    @Value("${kafka.topics.user-logged-in}")
-    private String userLoggedInTopic;
+    @Value("${kafka.topics.auth-events}")
+    private String authEventsTopic;
 
     public AuthEventProducer(KafkaTemplate<String, Object> kafkaTemplate) {
         this.kafkaTemplate = kafkaTemplate;
@@ -25,13 +22,14 @@ public class AuthEventProducer implements AuthEventPublisherPort {
 
     @Override
     public void publishUserRegistered(User user) {
-        kafkaTemplate.send(userRegisteredTopic, user.getId(),
-            new UserRegisteredEvent(user.getId(), user.getUsername(), user.getEmail(), user.getRole()));
+        kafkaTemplate.send(authEventsTopic, user.getId(),
+            new UserRegisteredEvent(user.getId(), user.getUsername(), user.getEmail(),
+                                    user.getRole(), user.isMfaEnabled()));
     }
 
     @Override
     public void publishUserLoggedIn(User user) {
-        kafkaTemplate.send(userLoggedInTopic, user.getId(),
+        kafkaTemplate.send(authEventsTopic, user.getId(),
             new UserLoggedInEvent(user.getId(), user.getEmail()));
     }
 }

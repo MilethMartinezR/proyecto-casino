@@ -4,22 +4,44 @@ server:
 spring:
   application:
     name: auth-service
+
+  # MySQL — write side (usuarios)
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://mysql:3306/casino_db}
+    username: ${SPRING_DATASOURCE_USERNAME:casino_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:casino_pass}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    database-platform: org.hibernate.dialect.MySQLDialect
+
+  # MongoDB — read side (sesiones efímeras)
   data:
     mongodb:
-      uri: ${MONGO_URI:mongodb://localhost:27017/casino_auth}
-      database: casino_auth
+      uri: ${MONGO_URI:mongodb://casino_admin:casino_secret@mongodb:27017/casino_db?authSource=admin}
+      database: ${MONGO_DATABASE:casino_db}
+
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
+# Eureka
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://eureka:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
 jwt:
   secret: ${JWT_SECRET:casino_jwt_super_secret_2025}
-  expiration-ms: 86400000        # 24h
-  mfa-expiration-ms: 300000      # 5 min
+  expiration-ms: 86400000       # 24h
+  mfa-expiration-ms: 300000     # 5 min
 
 kafka:
   topics:
-    user-registered: user-registered
-    user-logged-in: user-logged-in
+    auth-events: auth-events

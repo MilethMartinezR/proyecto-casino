@@ -7,9 +7,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.infrastructure.config.settings import settings
-from app.infrastructure.adapter.out.persistence.database import engine, Base
-from app.infrastructure.adapter.out.persistence.admin_model import UsuarioSnapshotModel
-from app.infrastructure.adapter.out.persistence.report_model import ReporteModel
 from app.infrastructure.adapter.out.messaging.kafka_event_publisher import stop_producer
 from app.infrastructure.adapter.incoming.rest.admin_router import router as admin_router
 from app.infrastructure.adapter.incoming.messaging.kafka_consumer import start_consumer
@@ -20,9 +17,6 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Creating database tables...")
-    Base.metadata.create_all(bind=engine)
-
     if settings.eureka_server_url:
         logger.info("Registering with Eureka...")
         await eureka_client.init_async(

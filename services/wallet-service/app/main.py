@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -6,23 +7,21 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.infrastructure.config.settings import settings
-from app.infrastructure.adapter.out.persistence.database import engine
-from app.infrastructure.adapter.out.persistence.wallet_model import WalletModel
-from app.infrastructure.adapter.out.persistence.transaction_model import TransactionModel, SolicitudRetiroModel
 from app.infrastructure.adapter.out.messaging.kafka_event_publisher import stop_producer
+from app.infrastructure.adapter.incoming.messaging.kafka_consumer import start_game_events_consumer
 from app.infrastructure.adapter.incoming.rest.wallet_router import router as wallet_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+_consumer_task: asyncio.Task | None = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Creating database tables...")
-    from app.infrastructure.adapter.out.persistence.database import Base
-    Base.metadata.create_all(bind=engine)
+    global _consumer_task
 
-    logger.info("Registering with Eureka...")
+    logger.info("[wallet-service] Registrando en Eureka...")
     await eureka_client.init_async(
         eureka_server=settings.eureka_server_url,
         app_name=settings.service_name,
@@ -30,11 +29,18 @@ async def lifespan(app: FastAPI):
         instance_host="wallet-service",
     )
 
+    logger.info("[wallet-service] Iniciando consumer de Kafka...")
+    _consumer_task = asyncio.create_task(start_game_events_consumer())
+
     yield
+
+    if _consumer_task:
+        _consumer_task.cancel()
+        await asyncio.gather(_consumer_task, return_exceptions=True)
 
     await stop_producer()
     await eureka_client.stop_async()
-    logger.info("wallet-service shut down cleanly")
+    logger.info("[wallet-service] Apagado limpio")
 
 
 app = FastAPI(

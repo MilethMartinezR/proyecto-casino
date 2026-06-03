@@ -3,17 +3,20 @@ package co.casino.auth.infrastructure.adapter.out.messaging.kafka.event;
 import java.time.Instant;
 
 public class UserLoggedInEvent {
-    private String userId;
-    private String email;
-    private Instant occurredAt;
 
-    public UserLoggedInEvent(String userId, String email) {
-        this.userId = userId;
+    private final String event_type = "USUARIO_LOGUEADO";
+    private String usuario_id;
+    private String email;
+    private Instant timestamp;
+
+    public UserLoggedInEvent(String usuarioId, String email) {
+        this.usuario_id = usuarioId;
         this.email = email;
-        this.occurredAt = Instant.now();
+        this.timestamp = Instant.now();
     }
 
-    public String getUserId() { return userId; }
+    public String getEvent_type() { return event_type; }
+    public String getUsuario_id() { return usuario_id; }
     public String getEmail() { return email; }
-    public Instant getOccurredAt() { return occurredAt; }
+    public Instant getTimestamp() { return timestamp; }
 }

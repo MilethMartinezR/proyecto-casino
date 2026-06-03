@@ -11,12 +11,11 @@ from app.domain.model.admin_user import AdminUser, EstadoUsuario
 
 logger = logging.getLogger(__name__)
 
-TOPICS = ["auth-events", "wallet-events"]
+TOPICS = ["auth-events", "wallet-events", "game-events"]
 GROUP_ID = "admin-service-group"
 
 
-def _upsert_usuario(data: dict, db: Session):
-    event_type = data.get("event_type", "")
+def _handle_auth_event(event_type: str, data: dict, db: Session):
     usuario_id = data.get("usuario_id")
     if not usuario_id:
         return
@@ -26,14 +25,13 @@ def _upsert_usuario(data: dict, db: Session):
 
     if event_type == "USUARIO_REGISTRADO":
         if not user:
-            user = AdminUser(
+            repo.save_user(AdminUser(
                 usuario_id=usuario_id,
                 nombre=data.get("nombre", ""),
                 email=data.get("email", ""),
                 estado=EstadoUsuario.PENDIENTE_VERIFICACION,
                 mfa_habilitado=data.get("mfa_habilitado", False),
-            )
-            repo.save_user(user)
+            ))
 
     elif event_type in ("USUARIO_ACTIVADO", "MFA_VERIFICADO"):
         if user:
@@ -46,11 +44,32 @@ def _upsert_usuario(data: dict, db: Session):
             repo.save_user(user)
 
 
+def _handle_game_event(event_type: str, data: dict, db: Session):
+    # Registra movimientos de créditos para que los reportes
+    # no dependan de consultar directamente la tabla de wallet-service
+    if event_type not in ("GAME_FINISHED", "GAME_BUST", "GAME_ABANDONED"):
+        return
+
+    repo = AdminRepositoryAdapter(db)
+    repo.save_movimiento({
+        "usuario_id":      data.get("userId"),
+        "game_id":         data.get("gameId"),
+        "event_type":      event_type,
+        "monto_apostado":  data.get("apuesta", 0),
+        "monto_ganado":    data.get("pago", 0),
+        "timestamp":       data.get("timestamp"),
+    })
+
+
 async def _process_message(topic: str, data: dict, db: Session):
+    event_type = data.get("event_type") or data.get("eventType", "")
+
     if topic == "auth-events":
-        _upsert_usuario(data, db)
-    # wallet-events no requieren persistencia aquí,
-    # se consultan directamente en la generación de reportes
+        _handle_auth_event(event_type, data, db)
+    elif topic == "game-events":
+        _handle_game_event(event_type, data, db)
+    # wallet-events: los datos de créditos comprados ya se obtienen
+    # via game-events + movimientos propios; sin acción adicional aquí
 
 
 async def start_consumer():
@@ -62,16 +81,19 @@ async def start_consumer():
         auto_offset_reset="earliest",
     )
     await consumer.start()
-    logger.info("Kafka consumer started on topics: %s", TOPICS)
+    logger.info("[admin] Kafka consumer iniciado en topics: %s", TOPICS)
     try:
         async for msg in consumer:
             db = SessionLocal()
             try:
                 await _process_message(msg.topic, msg.value, db)
             except Exception as e:
-                logger.error("Error processing message [%s]: %s", msg.topic, e)
+                logger.error("[admin] Error procesando mensaje [%s]: %s", msg.topic, e)
                 db.rollback()
             finally:
                 db.close()
+    except asyncio.CancelledError:
+        pass
     finally:
         await consumer.stop()
+        logger.info("[admin] Kafka consumer detenido")

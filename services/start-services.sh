@@ -9,13 +9,13 @@ done
 echo "[services] Platform listo. Iniciando microservicios..."
 
 # auth-service — Spring Boot — 8081
-if [ -f /app/auth-service/pom.xml ]; then
-  cd /app/auth-service && mvn -q package -DskipTests && java -jar target/*.jar &
+if [ -f /app/auth-service/target/*.jar ]; then
+  cd /app/auth-service && java -jar target/*.jar &
 fi
 
 # audit-service — Spring Boot — 8084
-if [ -f /app/audit-service/pom.xml ]; then
-  cd /app/audit-service && mvn -q package -DskipTests && java -jar target/*.jar &
+if [ -f /app/audit-service/target/*.jar ]; then
+  cd /app/audit-service && java -jar target/*.jar &
 fi
 
 # wallet-service — FastAPI — 8082
