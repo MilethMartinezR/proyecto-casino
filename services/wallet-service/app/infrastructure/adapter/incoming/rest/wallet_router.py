@@ -5,7 +5,7 @@ from app.application.command.deposit_command_handler import DepositCommandHandle
 from app.application.command.withdraw_command_handler import WithdrawCommandHandler
 from app.application.query.get_balance_query_handler import GetBalanceQueryHandler
 from app.application.query.get_transactions_query_handler import GetTransactionsQueryHandler
-from app.application.dto.wallet_schemas import WalletResponse, DepositRequest, WithdrawRequest
+from app.application.dto.wallet_schemas import WalletResponse, DepositRequest, WithdrawRequest, CobrarApuestaRequest
 from app.application.dto.transaction_schemas import TransaccionResponse, SolicitudRetiroResponse
 from app.infrastructure.adapter.incoming.rest.auth_middleware import verify_token
 from app.infrastructure.adapter.out.persistence.database import get_db
@@ -70,6 +70,38 @@ def ejecutar_retiro(
         return WithdrawCommandHandler(_make_repo(db), KafkaEventPublisher()).ejecutar_retiro(solicitud_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/cobrar-apuesta", response_model=TransaccionResponse, status_code=201)
+def cobrar_apuesta(
+    req: CobrarApuestaRequest,
+    db: Session = Depends(get_db),
+    _token: dict = Depends(verify_token),
+):
+    """Endpoint interno: game-service cobra créditos por apuesta."""
+    from app.domain.model.transaction import Transaction, TipoTransaccion, EstadoTx
+    from app.domain.exception.wallet_not_found_error import WalletNotFoundError
+    from app.domain.exception.insufficient_funds_error import InsufficientFundsError
+
+    repo = _make_repo(db)
+    wallet = repo.find_by_usuario_id(req.usuario_id)
+    if not wallet:
+        raise HTTPException(status_code=404, detail=f"Wallet no encontrada para usuario {req.usuario_id}")
+    if not wallet.tiene_fondos(req.monto_creditos):
+        raise HTTPException(status_code=422, detail="Saldo insuficiente para realizar la apuesta")
+
+    wallet.debitar(req.monto_creditos)
+    repo.save_wallet(wallet)
+
+    tx = Transaction(
+        wallet_id=wallet.wallet_id,
+        tipo=TipoTransaccion.APUESTA,
+        monto=req.monto_creditos / wallet.tasa_cambio,
+        monto_creditos=req.monto_creditos,
+        estado=EstadoTx.COMPLETADA,
+        descripcion=req.descripcion or f"Apuesta: {req.monto_creditos} créditos",
+    )
+    return repo.save_transaction(tx)
 
 
 @router.get("/transactions/{usuario_id}", response_model=list[TransaccionResponse])

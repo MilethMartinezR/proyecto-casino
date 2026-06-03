@@ -20,4 +20,10 @@ class DepositRequest(BaseModel):
 class WithdrawRequest(BaseModel):
     usuario_id: str
     monto_creditos: float = Field(..., gt=0, description="Créditos a retirar")
-    cuenta_destino: str = Field(..., min_length=5)
+    cuenta_destino: str = Field(..., min_length=3)
+
+
+class CobrarApuestaRequest(BaseModel):
+    usuario_id: str
+    monto_creditos: float = Field(..., gt=0, description="Créditos a descontar por apuesta")
+    descripcion: str = None

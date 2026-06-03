@@ -17,7 +17,7 @@ COPY services/wallet-service ./wallet-service
 COPY services/admin-service  ./admin-service
 COPY services/game-service   ./game-service
 COPY services/start-services.sh /usr/local/bin/start-services.sh
-RUN chmod +x /usr/local/bin/start-services.sh
+RUN sed -i 's/\r//' /usr/local/bin/start-services.sh && chmod +x /usr/local/bin/start-services.sh
 
 RUN if [ -f /app/wallet-service/requirements.txt ]; then pip3 install -r /app/wallet-service/requirements.txt; fi
 RUN if [ -f /app/admin-service/requirements.txt ]; then pip3 install -r /app/admin-service/requirements.txt; fi
@@ -29,4 +29,4 @@ RUN if [ -f /app/audit-service/pom.xml ] && [ -s /app/audit-service/pom.xml ]; t
 
 EXPOSE 8081 8082 8083 8084 8085
 
-CMD ["/usr/local/bin/start-services.sh"]
+CMD ["bash", "/usr/local/bin/start-services.sh"]

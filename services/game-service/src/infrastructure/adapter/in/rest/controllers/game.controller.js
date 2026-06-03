@@ -49,8 +49,8 @@ class GameController {
   async history(req, res, next) {
     try {
       const limit = parseInt(req.query.limit ?? '10');
-      const result = await this.getHistory.execute(req.params.userId, limit);
-      res.json(result);
+      const partidas = await this.getHistory.execute(req.params.userId, limit);
+      res.json({ partidas: partidas || [] });
     } catch (err) { next(err); }
   }
 }

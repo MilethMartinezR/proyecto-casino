@@ -42,10 +42,10 @@ services:
       - casino-net
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
+      interval: 15s
+      timeout: 15s
       retries: 10
-      start_period: 20s
+      start_period: 30s
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -174,7 +174,7 @@ services:
       AUDIT_SERVICE_URL: http://localhost:8084
       AUTH_SERVICE_URL: http://localhost:8081
       # Seguridad
-      JWT_SECRET: casino_jwt_super_secret_2025
+      JWT_SECRET: casino_jwt_super_secret_key_2025_secure_32b
       PORT: 8083
       SPRING_KAFKA_CONSUMER_GROUP_ID: casino-consumer-group
     networks:
@@ -193,9 +193,12 @@ services:
     depends_on:
       - services
     ports:
-      - "3000:3000"
+      - "3000:80"
     environment:
-      REACT_APP_API_URL: http://localhost:8081
+      VITE_AUTH_URL: http://localhost:8081
+      VITE_WALLET_URL: http://localhost:8082
+      VITE_GAME_URL: http://localhost:8083
+      VITE_ADMIN_URL: http://localhost:8085
     networks:
       - casino-net
 

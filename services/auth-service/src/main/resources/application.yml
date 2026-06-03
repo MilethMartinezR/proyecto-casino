@@ -38,7 +38,7 @@ eureka:
     prefer-ip-address: true
 
 jwt:
-  secret: ${JWT_SECRET:casino_jwt_super_secret_2025}
+  secret: ${JWT_SECRET:casino_jwt_super_secret_key_2025_secure_32b}
   expiration-ms: 86400000
   mfa-expiration-ms: 300000
 

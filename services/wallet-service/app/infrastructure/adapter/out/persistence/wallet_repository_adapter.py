@@ -50,6 +50,10 @@ class WalletRepositoryAdapter(WalletRepositoryPort):
         m = self._db.query(WalletModel).filter(WalletModel.usuario_id == usuario_id).first()
         return _to_wallet_domain(m) if m else None
 
+    def find_by_wallet_id(self, wallet_id: str) -> Optional[Wallet]:
+        m = self._db.query(WalletModel).filter(WalletModel.wallet_id == wallet_id).first()
+        return _to_wallet_domain(m) if m else None
+
     def save_wallet(self, wallet: Wallet) -> Wallet:
         m = self._db.query(WalletModel).filter(WalletModel.wallet_id == wallet.wallet_id).first()
         if m:

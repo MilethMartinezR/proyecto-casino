@@ -48,9 +48,7 @@ class WithdrawCommandHandler(WithdrawUseCase):
             raise ValueError("Solicitud ya procesada")
 
         tx = self._repo.find_transaction_by_id(solicitud.transaccion_id)
-        wallet = self._repo.find_by_usuario_id(
-            self._repo.find_transaction_by_id(solicitud.transaccion_id).wallet_id
-        )
+        wallet = self._repo.find_by_wallet_id(tx.wallet_id)
 
         wallet.debitar(tx.monto_creditos)
         self._repo.save_wallet(wallet)
