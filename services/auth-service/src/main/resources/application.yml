@@ -1,0 +1,25 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: auth-service
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://localhost:27017/casino_auth}
+      database: casino_auth
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+jwt:
+  secret: ${JWT_SECRET:casino_jwt_super_secret_2025}
+  expiration-ms: 86400000        # 24h
+  mfa-expiration-ms: 300000      # 5 min
+
+kafka:
+  topics:
+    user-registered: user-registered
+    user-logged-in: user-logged-in
