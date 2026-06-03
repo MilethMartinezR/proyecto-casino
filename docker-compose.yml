@@ -1,73 +1,188 @@
 services:
-  infra:
-    build:
-      context: .
-      dockerfile: infra/Dockerfile
-    container_name: casino-infra
+
+  # ════════════════════════════════════════════════════════════════════════
+  # PLATFORM — MySQL · MongoDB · Kafka · Eureka
+  # ════════════════════════════════════════════════════════════════════════
+
+  mysql:
+    image: mysql:8.0
+    container_name: casino-mysql
     restart: unless-stopped
-    ports:
-      - "27017:27017"
-      - "3306:3306"
-      - "9092:9092"
-      - "2181:2181"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: casino_admin
-      MONGO_INITDB_ROOT_PASSWORD: casino_secret
-      MONGO_INITDB_DATABASE: casino_db
       MYSQL_ROOT_PASSWORD: root_secret
       MYSQL_DATABASE: casino_db
       MYSQL_USER: casino_user
       MYSQL_PASSWORD: casino_pass
-      KAFKA_BROKER_ID: 1
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://infra:9092
-      KAFKA_ZOOKEEPER_CONNECT: localhost:2181
     volumes:
-      - infra-mongodb:/data/db
-      - infra-mysql:/var/lib/mysql
-      - infra-kafka:/opt/kafka/data
-      - infra-zookeeper:/tmp/zookeeper
+      - platform-mysql:/var/lib/mysql
+      - ./platform/init-scripts/mysql:/docker-entrypoint-initdb.d
+    ports:
+      - "3306:3306"
     networks:
       - casino-net
     healthcheck:
-      test: ["CMD-SHELL","bash -c 'nc -z localhost 27017 && nc -z localhost 3306 && nc -z localhost 9092 && nc -z localhost 2181'"]
-      interval: 20s
-      timeout: 10s
-      retries: 5
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ucasino_user", "-pcasino_pass"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
-  backend:
-    build:
-      context: .
-      dockerfile: infra/backend/Dockerfile
-    container_name: casino-backend
+  mongodb:
+    image: mongo:6.0
+    container_name: casino-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: casino_admin
+      MONGO_INITDB_ROOT_PASSWORD: casino_secret
+    volumes:
+      - platform-mongodb:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - casino-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: casino-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - platform-zookeeper:/var/lib/zookeeper
+    networks:
+      - casino-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: casino-kafka
     restart: unless-stopped
     depends_on:
-      - infra
-    ports:
-      - "8081:8081"
-      - "8082:8082"
-      - "8083:8083"
-      - "8084:8084"
-      - "8085:8085"
+      - zookeeper
     environment:
-      SPRING_DATA_MONGODB_URI: mongodb://casino_admin:casino_secret@infra:27017/casino_db?authSource=admin
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: infra:9092
-      DATABASE_URL: mysql+pymysql://casino_user:casino_pass@infra:3306/casino_db
-      KAFKA_BOOTSTRAP_SERVERS: infra:9092
-      WALLET_SERVICE_URL: http://localhost:8082
-      AUDIT_SERVICE_URL: http://localhost:8084
-      PORT: 8083
-      JWT_SECRET: casino_jwt_super_secret_2025
-      EUREKA_SERVER_URL: http://localhost:8761/eureka/
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://localhost:8761/eureka/
-      SPRING_KAFKA_CONSUMER_GROUP_ID: audit-consumer-group
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    volumes:
+      - platform-kafka:/var/lib/kafka/data
+    ports:
+      - "9092:9092"
     networks:
       - casino-net
     healthcheck:
-      test: ["CMD-SHELL","curl -f http://localhost:8081/auth/ping || exit 1"]
-      interval: 30s
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 15s
       timeout: 10s
-      retries: 5
+      retries: 10
+      start_period: 30s
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: casino-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      "
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic game-events   --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic wallet-events --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic user-events   --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic audit-events  --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic admin-events  --partitions 3 --replication-factor 1
+      echo 'Topics creados.'
+      "
+    networks:
+      - casino-net
+    restart: "no"
+
+  eureka:
+    build:
+      context: ./platform
+      dockerfile: Dockerfile
+    container_name: casino-eureka
+    restart: unless-stopped
+    ports:
+      - "8761:8761"
+    networks:
+      - casino-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8761/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+
+  # ════════════════════════════════════════════════════════════════════════
+  # SERVICES — todos los microservicios en un contenedor
+  # ════════════════════════════════════════════════════════════════════════
+
+  services:
+    build:
+      context: .
+      dockerfile: services/Dockerfile
+    container_name: casino-services
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      eureka:
+        condition: service_healthy
+    ports:
+      - "8081:8081"  # auth-service
+      - "8082:8082"  # wallet-service
+      - "8083:8083"  # game-service
+      - "8084:8084"  # audit-service
+      - "8085:8085"  # admin-service
+    environment:
+      # MySQL — write side
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/casino_db
+      SPRING_DATASOURCE_USERNAME: casino_user
+      SPRING_DATASOURCE_PASSWORD: casino_pass
+      DATABASE_URL: mysql+pymysql://casino_user:casino_pass@mysql:3306/casino_db
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: casino_user
+      MYSQL_PASSWORD: casino_pass
+      MYSQL_DATABASE: casino_db
+      # MongoDB — read side
+      SPRING_DATA_MONGODB_URI: mongodb://casino_admin:casino_secret@mongodb:27017/casino_db?authSource=admin
+      MONGO_URI: mongodb://casino_admin:casino_secret@mongodb:27017/casino_db?authSource=admin
+      MONGO_DATABASE: casino_db
+      # Kafka
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # Eureka
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka:8761/eureka/
+      EUREKA_HOST: eureka
+      EUREKA_PORT: 8761
+      # Inter-servicio (dentro del mismo contenedor → localhost)
+      WALLET_SERVICE_URL: http://localhost:8082
+      AUDIT_SERVICE_URL: http://localhost:8084
+      AUTH_SERVICE_URL: http://localhost:8081
+      # Seguridad
+      JWT_SECRET: casino_jwt_super_secret_2025
+      PORT: 8083
+      SPRING_KAFKA_CONSUMER_GROUP_ID: casino-consumer-group
+    networks:
+      - casino-net
+
+  # ════════════════════════════════════════════════════════════════════════
+  # FRONTEND
+  # ════════════════════════════════════════════════════════════════════════
 
   frontend:
     build:
@@ -76,23 +191,20 @@ services:
     container_name: casino-frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      - services
     ports:
       - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:8081
     networks:
       - casino-net
-    healthcheck:
-      test: ["CMD-SHELL","curl -f http://localhost:3000 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
 
 networks:
   casino-net:
     driver: bridge
 
 volumes:
-  infra-mongodb:
-  infra-mysql:
-  infra-kafka:
-  infra-zookeeper:
+  platform-mysql:
+  platform-mongodb:
+  platform-kafka:
+  platform-zookeeper:
