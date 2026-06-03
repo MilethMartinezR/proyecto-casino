@@ -1,0 +1,27 @@
+{
+  "name": "game-service",
+  "version": "1.0.0",
+  "description": "Game service - Casino project (DDD/Hexagonal + CQRS + Kafka)",
+  "main": "src/server.js",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "eureka-js-client": "^4.5.0",
+    "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.2",
+    "kafkajs": "^2.2.4",
+    "mongodb": "^6.8.0",
+    "morgan": "^1.10.0",
+    "mysql2": "^3.10.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}
