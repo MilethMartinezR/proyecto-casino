@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.infrastructure.config.settings import settings
 from app.infrastructure.adapter.out.messaging.kafka_event_publisher import stop_producer
-from app.infrastructure.adapter.incoming.messaging.kafka_consumer import start_game_events_consumer
+from app.infrastructure.adapter.incoming.messaging.kafka_consumer import start_game_events_consumer, start_auth_events_consumer
 from app.infrastructure.adapter.incoming.rest.wallet_router import router as wallet_router
 
 logging.basicConfig(level=logging.INFO)
@@ -31,6 +31,7 @@ async def lifespan(app: FastAPI):
 
     logger.info("[wallet-service] Iniciando consumer de Kafka...")
     _consumer_task = asyncio.create_task(start_game_events_consumer())
+    asyncio.create_task(start_auth_events_consumer())
 
     yield
 
